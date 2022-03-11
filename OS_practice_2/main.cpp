@@ -4,94 +4,62 @@
 #include <iostream>
 #include <iomanip>
 #include <sstream>
+#include <Windows.h>
 
-void work(uint16_t amount, uint16_t number);
+void work(uint16_t number, uint16_t amount, std::string hash);
 std::string sha256(uint8_t pass[6]);
 uint32_t rightrotate(uint32_t w, uint8_t s);
 std::mutex cout_guard;
 
+uint8_t pass[11881376][6];
+
 int main() {
-	std::cout << "Введите количество потоков для перебора (1-26):";
+	SetConsoleCP(1251);
+	SetConsoleOutputCP(1251);
+	for (uint32_t i = 0; i < 11881376; i++) {
+		pass[i][0] = i / 26 / 26 / 26 / 26 % 26 + 97;
+		pass[i][1] = i / 26 / 26 / 26 % 26 + 97;
+		pass[i][2] = i / 26 / 26 % 26 + 97;
+		pass[i][3] = i / 26 % 26 + 97;
+		pass[i][4] = i % 26 + 97;
+		pass[i][5] = 0;
+	}
+	std::cout << "Введите хеш: ";
+	std::string hash;
+	std::cin >> hash;
+	std::cout << "Введите количество потоков для перебора: ";
 	uint16_t amount;
 	std::cin >> amount;
-	if (amount == 1) {
-		std::thread workerA(work, 1, 0);
-	} else if (amount == 2) {
-		std::thread workerA(work, 2, 0);
-		std::thread workerB(work, 2, 1);
-	} else if (amount == 4) {
-		std::thread workerA(work, 4, 0);
-		std::thread workerB(work, 4, 1);
-		std::thread workerC(work, 4, 2);
-		std::thread workerD(work, 4, 3);
-	} else if (amount == 8) {
-		std::thread workerA(work, 8, 0);
-		std::thread workerB(work, 8, 1);
-		std::thread workerC(work, 8, 2);
-		std::thread workerD(work, 8, 3);
-		std::thread workerE(work, 8, 4);
-		std::thread workerF(work, 8, 5);
-		std::thread workerG(work, 8, 6);
-		std::thread workerH(work, 8, 7);
-	} else if (amount == 16) {
-		std::thread workerA(work, 16, 0);
-		std::thread workerB(work, 16, 1);
-		std::thread workerC(work, 16, 2);
-		std::thread workerD(work, 16, 3);
-		std::thread workerE(work, 16, 4);
-		std::thread workerF(work, 16, 5);
-		std::thread workerG(work, 16, 6);
-		std::thread workerH(work, 16, 7);
-		std::thread workerI(work, 16, 8);
-		std::thread workerJ(work, 16, 9);
-		std::thread workerK(work, 16, 10);
-		std::thread workerL(work, 16, 11);
-		std::thread workerM(work, 16, 12);
-		std::thread workerN(work, 16, 13);
-		std::thread workerO(work, 16, 14);
-		std::thread workerP(work, 16, 15);
+	std::thread* worker = new std::thread[amount];
+	for (uint32_t i = 0; i < amount; i++) {
+		worker[i] = std::thread(work, i, amount, hash);
 	}
-
-	/*for (int i = 0; i < amount; i++) {
-		work(amount, i);
-		//std::thread worker(work, amount, i);
-		//worker.detach();
-	}*/
-	//uint8_t pass[5] = { 97,98,99,100,101 };
-	//std::cout << sha256(pass);
+	for (uint32_t i = 0; i < amount; i++) {
+		worker[i].join();
+	}
 	return 0;
 }
 
-void work(uint16_t amount, uint16_t number) {
+void work(uint16_t number, uint16_t amount, std::string hash) {
 
-	uint8_t from = 26 / amount * number, to = 26 / amount * (number + 1);
-	if (number < 26 % amount) {
+	uint32_t from = 11881376 / amount * number, to = 11881376 / amount * (number + 1);
+	if (number < 11881376 % amount) {
 		from = from + number;
 		to = to + number + 1;
-	} else {
-		from = from + 26 % amount;
-		to = to + 26 % amount;
+	}
+	else {
+		from = from + 11881376 % amount;
+		to = to + 11881376 % amount;
 	}
 
-	uint8_t pass[6] = { 0, 0, 0, 0, 0, '\0'};
-	for (int i = from; i < to; i++) {
-		pass[0] = 97 + i;
-		for (int j = 0; j < 26; j++) {
-			pass[1] = 97 + j;
-			for (int k = 0; k < 26; k++) {
-				pass[2] = 97 + k;
-				for (int l = 0; l < 26; l++) {
-					pass[3] = 97 + l;
-					for (int m = 0; m < 26; m++) {
-						pass[4] = 97 + m;
-						cout_guard.lock();
-						std::cout << pass << '\n';
-						cout_guard.unlock();
-					}
-				}
-			}
+	for (uint32_t i = from; i < to; i++) {
+		if (hash == sha256(pass[i])) {
+			cout_guard.lock();
+			std::cout << pass[i] << '\n';
+			cout_guard.unlock();
 		}
 	}
+
 }
 
 std::string sha256(uint8_t pass[6]) {
@@ -136,9 +104,9 @@ std::string sha256(uint8_t pass[6]) {
 		0, 0, 0, 0, 0, 0, 0, 0,
 		0, 0, 0, 0, 0, 0, 0, 0
 	};
-	for (int i = 0; i < 16; i++) w[i] = (s[4*i] << 24) + (s[4*i + 1] << 16) + (s[4*i + 2] << 8) + s[4*i + 3];
+	for (uint32_t i = 0; i < 16; i++) w[i] = (s[4*i] << 24) + (s[4*i + 1] << 16) + (s[4*i + 2] << 8) + s[4*i + 3];
 
-	for (int i = 16; i < 64; i++) {
+	for (uint32_t i = 16; i < 64; i++) {
 		uint32_t s0 = rightrotate(w[i - 15], 7) ^ rightrotate(w[i - 15], 18) ^ (w[i - 15] >> 3);
 		uint32_t s1 = rightrotate(w[i - 2], 17) ^ rightrotate(w[i - 2], 19) ^ (w[i - 2] >> 10);
 		w[i] = w[i - 16] + s0 + w[i - 7] + s1;
@@ -180,7 +148,7 @@ std::string sha256(uint8_t pass[6]) {
 	h7 += h;
 
 	std::stringstream sha256;
-	sha256 << std::hex << h0 << h1 << h2 << h3 << h4 << h5 << h6 << h7;
+	sha256 << std::hex << std::setfill('0') << std::setw(8) << h0 << std::setw(8) << h1 << std::setw(8) << h2 << std::setw(8) << h3 << std::setw(8) << h4 << std::setw(8) << h5 << std::setw(8) << h6 << std::setw(8) << h7;
 	return sha256.str();
 }
 
