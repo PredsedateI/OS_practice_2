@@ -6,16 +6,52 @@
 #include <sstream>
 #include <Windows.h>
 
-void work(uint16_t number, uint16_t amount, std::string hash);
-std::string sha256(uint8_t pass[6]);
-uint32_t rightrotate(uint32_t w, uint8_t s);
-std::mutex cout_guard;
+class hash_int32 {
+public:
+	uint32_t h0;
+	uint32_t h1;
+	uint32_t h2;
+	uint32_t h3;
+	uint32_t h4;
+	uint32_t h5;
+	uint32_t h6;
+	uint32_t h7;
+	hash_int32(std::string hash) {
+		h0 = stoul(hash.substr(0, 8), 0, 16);
+		h1 = stoul(hash.substr(8, 8), 0, 16);
+		h2 = stoul(hash.substr(16, 8), 0, 16);
+		h3 = stoul(hash.substr(24, 8), 0, 16);
+		h4 = stoul(hash.substr(32, 8), 0, 16);
+		h5 = stoul(hash.substr(40, 8), 0, 16);
+		h6 = stoul(hash.substr(48, 8), 0, 16);
+		h7 = stoul(hash.substr(56, 8), 0, 16);
+	}
+	hash_int32(uint32_t n0, uint32_t n1, uint32_t n2, uint32_t n3, uint32_t n4, uint32_t n5, uint32_t n6, uint32_t n7) {
+		h0 = n0;
+		h1 = n1;
+		h2 = n2;
+		h3 = n3;
+		h4 = n4;
+		h5 = n5;
+		h6 = n6;
+		h7 = n7;
+	}
+};
+bool operator == (hash_int32 a, hash_int32 b) {
+	return { a.h0 == b.h0 and a.h1 == b.h1 and a.h2 == b.h2 and a.h3 == b.h3 and a.h4 == b.h4 and a.h5 == b.h5 and a.h6 == b.h6 and a.h7 == b.h7 };
+}
 
+void work(uint16_t number, uint16_t amount, hash_int32 hash);
+hash_int32 sha256(uint8_t pass[6]);
+uint32_t rightrotate(uint32_t w, uint8_t s);
+
+std::mutex cout_guard;
 uint8_t pass[11881376][6];
 
 int main() {
 	SetConsoleCP(1251);
 	SetConsoleOutputCP(1251);
+
 	for (uint32_t i = 0; i < 11881376; i++) {
 		pass[i][0] = i / 26 / 26 / 26 / 26 % 26 + 97;
 		pass[i][1] = i / 26 / 26 / 26 % 26 + 97;
@@ -24,23 +60,29 @@ int main() {
 		pass[i][4] = i % 26 + 97;
 		pass[i][5] = 0;
 	}
-	std::cout << "Введите хеш: ";
+
 	std::string hash;
+	std::cout << "Введите хеш: ";
 	std::cin >> hash;
-	std::cout << "Введите количество потоков для перебора: ";
+
+	hash_int32 hash_int(hash);
+	
 	uint16_t amount;
+	std::cout << "Введите количество потоков для перебора: ";
 	std::cin >> amount;
+
 	std::thread* worker = new std::thread[amount];
 	for (uint32_t i = 0; i < amount; i++) {
-		worker[i] = std::thread(work, i, amount, hash);
+		worker[i] = std::thread(work, i, amount, hash_int);
 	}
 	for (uint32_t i = 0; i < amount; i++) {
 		worker[i].join();
 	}
+
 	return 0;
 }
 
-void work(uint16_t number, uint16_t amount, std::string hash) {
+void work(uint16_t number, uint16_t amount, hash_int32 hash) {
 
 	uint32_t from = 11881376 / amount * number, to = 11881376 / amount * (number + 1);
 	if (number < 11881376 % amount) {
@@ -62,7 +104,7 @@ void work(uint16_t number, uint16_t amount, std::string hash) {
 
 }
 
-std::string sha256(uint8_t pass[6]) {
+hash_int32 sha256(uint8_t pass[6]) {
 	uint8_t s[64] = {
 		pass[0], pass[1], pass[2], pass[3], pass[4], 128, 0, 0,
 		0, 0, 0, 0, 0, 0, 0, 0,
@@ -104,7 +146,7 @@ std::string sha256(uint8_t pass[6]) {
 		0, 0, 0, 0, 0, 0, 0, 0,
 		0, 0, 0, 0, 0, 0, 0, 0
 	};
-	for (uint32_t i = 0; i < 16; i++) w[i] = (s[4*i] << 24) + (s[4*i + 1] << 16) + (s[4*i + 2] << 8) + s[4*i + 3];
+	for (uint32_t i = 0; i < 16; i++) w[i] = (s[4 * i] << 24) + (s[4 * i + 1] << 16) + (s[4 * i + 2] << 8) + s[4 * i + 3];
 
 	for (uint32_t i = 16; i < 64; i++) {
 		uint32_t s0 = rightrotate(w[i - 15], 7) ^ rightrotate(w[i - 15], 18) ^ (w[i - 15] >> 3);
@@ -146,10 +188,8 @@ std::string sha256(uint8_t pass[6]) {
 	h5 += f;
 	h6 += g;
 	h7 += h;
-
-	std::stringstream sha256;
-	sha256 << std::hex << std::setfill('0') << std::setw(8) << h0 << std::setw(8) << h1 << std::setw(8) << h2 << std::setw(8) << h3 << std::setw(8) << h4 << std::setw(8) << h5 << std::setw(8) << h6 << std::setw(8) << h7;
-	return sha256.str();
+	
+	return hash_int32( h0, h1, h2, h3, h4, h5, h6, h7 );
 }
 
 uint32_t rightrotate(uint32_t w, uint8_t s) {
